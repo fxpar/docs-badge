@@ -4,11 +4,17 @@ Application pour **trier, dédoublonner et étiqueter** des photos d'actes gén�
 Pensée pour une personne âgée (gros boutons, fort contraste, pas de jargon) et utilisable aussi par des enseignants
 qui annotent des devoirs scannés. **100 % local** : aucune photo ne quitte l'ordinateur.
 
+![Écran d'étiquetage : l'acte en pleine hauteur, les zones d'étiquettes autour (type de document, noms de famille, lieux) et la colonne avec la voix et la description](docs/captures/01-etiquetage.png)
+
 ## Pour la faire tester (rien à installer)
+
+En ligne : **<https://fxpar.github.io/docs-badge/>** — ou en local :
 
 1. Copier le fichier `index.html` sur l'ordinateur (clé USB, e-mail…), par exemple sur le Bureau.
 2. Double-cliquer dessus → il s'ouvre dans le navigateur. **Utiliser Google Chrome ou Microsoft Edge** (la voix ne marche pas dans Firefox).
-3. Sur l'accueil : « 🧪 Essayer avec des photos d'exemple » crée de faux actes, dont des doubles, pour découvrir l'appli.
+3. Sur l'accueil : « Essayer avec des photos d'exemple » crée de faux actes, dont des doubles, pour découvrir l'appli.
+
+![Accueil : ajouter des photos, trouver les doubles, mettre des étiquettes, retrouver, sauvegarder, réglages](docs/captures/02-accueil.png)
 
 Le travail est enregistré automatiquement dans le navigateur (IndexedDB), lié à ce navigateur et à cet emplacement de fichier :
 toujours rouvrir **le même fichier avec le même navigateur**. Le bouton « 💾 Sauvegarder mon travail » exporte un fichier JSON
@@ -22,6 +28,10 @@ Au premier lancement, l'application demande **les initiales** de la personne et 
   inscrites automatiquement quelques secondes après chaque changement et en passant à la photo suivante.
 - **Ne jamais toucher à mes photos** : les fichiers restent intacts, les étiquettes restent dans l'application, la liste se télécharge en tableau
   (une colonne par zone, description, baliseurs, date d'origine).
+
+| Chrome / Edge : les deux choix | Firefox : seulement « ne jamais toucher » |
+|---|---|
+| ![Fenêtre de bienvenue dans Chrome : initiales et choix « inscrire dans mes photos » ou « ne jamais toucher »](docs/captures/03-bienvenue-chrome.png) | ![Fenêtre de bienvenue dans Firefox : l'inscription dans les photos n'est pas proposée](docs/captures/04-bienvenue-firefox.png) |
 
 | Format | Où vont les étiquettes |
 |---|---|
@@ -43,6 +53,8 @@ se relisent ; Chrome écrit dans un fichier temporaire puis remplace l'original 
 arrivent en haut, **encadrées de pointillés** (appui long pour les ranger). L'empreinte des doublons porte sur l'image seule : une copie étiquetée
 reste reconnue comme double d'une copie qui ne l'est pas. *Réglages › Relier des photos à leur dossier* rattache les photos ajoutées sans accès.
 
+![Fin de l'ajout : nombre de photos ajoutées, copies identiques repérées, accès direct aux doubles ou à l'étiquetage](docs/captures/05-import-termine.png)
+
 ## Apparence
 
 - **Élégant** (par défaut) : papier ivoire, encre bleu nuit, touches de bronze, titres à empattements (Palatino / Iowan / Georgia,
@@ -54,13 +66,13 @@ reste reconnue comme double d'une copie qui ne l'est pas. *Réglages › Relier 
 
 | Besoin | Réalisation |
 |---|---|
-| Import depuis SD / disque | Choix d'un dossier entier (sous-dossiers compris), de quelques photos, ou glisser-déposer d'un dossier sur la fenêtre. Les originaux ne sont jamais modifiés : l'appli garde une copie réduite (2200 px, lisible pour un acte) + une vignette. |
-| Doublons exacts | Empreinte **SHA-256** de chaque fichier. Les copies identiques partagent la même image stockée. Bouton « garder une seule copie de chaque » en un clic. |
-| Quasi-doublons | Empreinte visuelle 32×32 en niveaux de gris, comparée par corrélation (≥ 95 %), ou même poids (±2 %) + dates proches (±10 min) + allure voisine. Proportions très différentes = ignoré. |
+| Import depuis SD / disque | Choix d'un dossier entier (sous-dossiers compris), de quelques photos, ou glisser-déposer d'un dossier sur la fenêtre. Les originaux ne sont ni déplacés ni effacés (seules les étiquettes y sont inscrites si on l'a choisi) : l'appli garde une copie réduite (2200 px, lisible pour un acte) + une vignette. |
+| Doublons exacts | Empreinte **SHA-256 de l'image seule** (sans les informations ajoutées). Les copies identiques partagent la même image stockée. Bouton « garder une seule copie de chaque » en un clic. |
+| Quasi-doublons | Empreinte visuelle 32×32 en niveaux de gris, comparée par corrélation (≥ 90 %), ou même poids (±2 %) + dates d'origine proches (±10 min) + allure voisine. Proportions très différentes = ignoré. |
 | Comparaison | Deux images côte à côte, différences surlignées, « ★ Meilleure qualité » indiquée. Un clic (ou ← / →) garde une photo, l'autre va dans la corbeille ; ses étiquettes et sa description sont reportées. « Ce ne sont pas des doubles » est mémorisé. Tout est annulable (↶ Annuler, Ctrl+Z). |
 | Voix | Web Speech API en `fr-FR`, **uniquement sur l'ordinateur** (`processLocally = true`, Chrome récent) avec les étiquettes et le dictionnaire comme mots favoris ; l'appli propose d'installer la voix française une fois si besoin. **Aucun envoi en ligne** : si le navigateur ne sait pas reconnaître la voix localement, la voix est simplement indisponible (le clavier reste possible). |
 | Mains libres | Un clic sur « Parler » (ou la **barre d'espace**) : le micro reste ouvert et on enchaîne « mariage Dupond Rennes, suivante… ». Coupé par « stop », un clic, la barre d'espace, en quittant l'écran ou après 3 min sans parole. |
-| Description à la voix | « description » fait passer en **dictée libre** (le champ s'encadre, le bouton affiche « Dictée de la description… ») : tout ce qui est dit s'ajoute au texte. Ponctuation à la voix (« virgule », « point », « point d'interrogation », « à la ligne », parenthèses, guillemets), majuscules automatiques, dictionnaire personnel appliqué. Dits **seuls**, « étiquettes » ramène aux étiquettes, « annuler » retire la dernière phrase, « suivante » / « stop » restent des commandes (dans une phrase, ce sont des mots normaux). Changer de photo ramène aux étiquettes. |
+| Description à la voix | « description » fait passer en **dictée libre** (le champ s'encadre, le bouton affiche « Dictée en cours ») : tout ce qui est dit s'ajoute au texte. Ponctuation à la voix (« virgule », « point », « point d'interrogation », « à la ligne », parenthèses, guillemets), majuscules automatiques, dictionnaire personnel appliqué. Dits **seuls**, « étiquettes » ramène aux étiquettes, « annuler » retire la dernière phrase, « suivante » / « stop » restent des commandes (dans une phrase, ce sont des mots normaux). Changer de photo ramène aux étiquettes. |
 | Compréhension | Les phrases sont découpées, les petits mots ignorés, les étiquettes reconnues même mal orthographiées (distance d'édition + « clé sonore » française : Dupont ≈ Dupond ≈ Dupon). Commandes, n'importe où dans la phrase et exécutées dans l'ordre : « suivante », « précédente », « enlève Rennes », « annuler », « stop » ; « description … » en début de phrase (passage en dictée). |
 | Dictionnaire personnel | Pour chaque mot non reconnu : « ＋ l'ajouter » dans une zone, ou « ✎ Mal compris, corriger » → le couple *entendu → correct* est retenu et appliqué aux prochaines dictées. Gérable dans Réglages. |
 | Badges autour de l'image | 3 zones (haut / gauche / droite, renommables) qui défilent. Clic = coller/décoller ; glisser vers la photo = coller ; **appui long** = l'étiquette se soulève : la lâcher sur une autre pour les **échanger**, sur une autre zone pour l'y **déplacer**, ou sur place pour ouvrir le panneau (nom, couleur, zone, ordre, suppression). « ＋ Nouveau » dans chaque zone. Le compteur sur chaque badge indique son usage. |
@@ -68,6 +80,8 @@ reste reconnue comme double d'une copie qui ne l'est pas. *Réglages › Relier 
 | Enlever une étiquette | Geste : **jeter** l'étiquette collée vers le bord (elle devient rouge « lâchez pour enlever »), ou ✕. Annulable. |
 | Description libre | Champ texte enregistré automatiquement, ou dictée « description … ». |
 | Retrouver | Recherche plein texte (nom, dossier, étiquettes, description), filtres « sans étiquette », par étiquettes combinées, corbeille (remettre / vider). |
+
+![Comparaison de deux doubles côte à côte : fichier, dossier, qualité, poids, date et étiquettes, différences surlignées](docs/captures/06-doubles.png)
 
 ## Architecture recommandée pour la suite
 
