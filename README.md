@@ -76,6 +76,7 @@ reste reconnue comme double d'une copie qui ne l'est pas. *Réglages › Relier 
 | Compréhension | Les phrases sont découpées, les petits mots ignorés, les étiquettes reconnues même mal orthographiées (distance d'édition + « clé sonore » française : Dupont ≈ Dupond ≈ Dupon). Commandes, n'importe où dans la phrase et exécutées dans l'ordre : « suivante », « précédente », « enlève Rennes », « annuler », « stop » ; « description … » en début de phrase (passage en dictée). |
 | Dictionnaire personnel | Pour chaque mot non reconnu : « ＋ l'ajouter » dans une zone, ou « ✎ Mal compris, corriger » → le couple *entendu → correct* est retenu et appliqué aux prochaines dictées. Gérable dans Réglages. |
 | Badges autour de l'image | 3 zones (haut / gauche / droite, renommables) qui défilent. Clic = coller/décoller ; glisser vers la photo = coller ; **appui long** = l'étiquette se soulève : la lâcher sur une autre pour les **échanger**, sur une autre zone pour l'y **déplacer**, ou sur place pour ouvrir le panneau (nom, couleur, zone, ordre, suppression). « ＋ Nouveau » dans chaque zone. Le compteur sur chaque badge indique son usage. |
+| Étiquettes, couleurs et profils | Écran *Réglages › Gérer les étiquettes et les profils* (ou depuis l'appui long sur une étiquette) : **un tableau, une ligne par étiquette**, qu'on filtre (texte, zone, profil) et qu'on trie en cliquant sur les titres (couleur, nom, zone, profil, nombre de photos). Sur chaque ligne : couleur (8 teintes du thème ou n'importe quelle autre), nom, zone, profil, ordre ↑↓, suppression, et accès aux photos qui la portent. **Profils** : chaque activité a ses étiquettes et ses noms de zones (« Généalogie », « Devoirs scannés »…) ; on en crée un vide, par copie, ou depuis le modèle « Devoirs scannés » (Matière / Élève / Appréciation). On change de profil d'un clic, en haut de l'écran d'étiquetage. Les étiquettes déjà posées sur les photos restent quel que soit le profil ; la voix ne cherche que dans le profil affiché. |
 | Mise en page | Sur un écran d'ordinateur (≥ 1000 px de large), la photo occupe toute la hauteur — les actes, souvent verticaux, se lisent en entier — et une colonne plus étroite à côté regroupe légende, étiquettes collées, voix et description. Les zones d'étiquettes restent autour. Sur tablette ou fenêtre étroite, tout s'empile. |
 | Enlever une étiquette | Geste : **jeter** l'étiquette collée vers le bord (elle devient rouge « lâchez pour enlever »), ou ✕. Annulable. |
 | Description libre | Champ texte enregistré automatiquement, ou dictée « description … ». |
@@ -118,7 +119,8 @@ reste reconnue comme double d'une copie qui ne l'est pas. *Réglages › Relier 
 ```
 Photo   { id, hash(SHA-256), blobId, name, path, size, lastModified, width, height,
           sig(empreinte 32×32), tags[tagId], description, trashed, trashReason, copies[path] }
-Tag     { id, label, zone(top|left|right), order, color }
+Tag     { id, label, zone(top|left|right), order, color, profile, foreign? }
+Profil  { id, name, zoneNames{top,left,right} }
 Dict    [ { heard, correct } ]
 Meta    settings (taille du texte, noms des zones, mode voix), ignored (paires « pas des doubles »)
 ```

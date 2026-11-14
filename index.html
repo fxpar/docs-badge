@@ -473,6 +473,32 @@ section.card2 h2 [class^="ic-"]{color:var(--accent)}
   .info{gap:.5rem}
   .info .panel{padding-top:.5rem;padding-bottom:.55rem}
 }
+/* Bouton du profil dans la zone du haut */
+.zhead{display:inline-flex;align-items:center;gap:.6rem}
+.profbtn{text-transform:none;letter-spacing:0;font-size:.8rem;padding:.25rem .7rem;min-height:0;gap:.35rem}
+/* Écran « Étiquettes et profils » */
+.profchips{display:flex;flex-wrap:wrap;gap:.5rem;margin:.6rem 0}
+.profchips .cnt{display:inline-block;margin-left:.45rem;padding:0 .45rem;border-radius:999px;background:rgba(0,0,0,.12);font-size:.8em}
+.zonenames{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.4rem .8rem;margin:.4rem 0 .8rem}
+.tmtools{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.4rem 0 .8rem}
+.tmtools .searchwrap{flex:1 1 16rem;margin:0}
+.tmtools select.inp{width:auto;flex:0 1 auto}
+.tmwrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius)}
+.tmtable{width:100%;border-collapse:collapse;font-size:.95rem}
+.tmtable th{background:var(--surface,var(--panel,#fff));text-align:left;border-bottom:2px solid var(--line);padding:0;white-space:nowrap}
+.tmtable td{padding:.35rem .5rem;border-bottom:1px solid var(--line);vertical-align:middle}
+.tmtable tbody tr:hover{background:rgba(0,0,0,.025)}
+.tmtable td.num{text-align:center} .tmtable td.act{white-space:nowrap;text-align:right}
+.tmtable td.act .btn{margin-left:.25rem;min-width:2.4rem;justify-content:center}
+.tmtable .inp{padding:.35rem .5rem;min-height:0;margin:0}
+.tmtable select.inp{width:auto;max-width:14rem}
+.tmname{display:flex;flex-direction:column;gap:.1rem}
+.tmname .inp{min-width:10rem}
+.thsort{all:unset;box-sizing:border-box;display:block;width:100%;padding:.55rem .5rem;cursor:pointer;font-weight:700;font-size:.85rem;color:var(--ink-2,var(--muted))}
+.thsort:hover,.thsort.on{color:var(--primary)}
+.thsort:focus-visible{outline:3px solid var(--focus,var(--primary))}
+.swbtn{width:2.2rem;height:2.2rem;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25),0 1px 3px rgba(0,0,0,.2);cursor:pointer;display:block}
+.swbtn:hover{transform:scale(1.08)}
 #desc.dictating{min-height:9em;outline:3px solid var(--accent,var(--focus));outline-offset:2px;box-shadow:0 0 0 7px color-mix(in srgb,var(--accent,var(--focus)) 18%,transparent);transition:box-shadow .2s}
 </style>
 </head>
@@ -514,7 +540,7 @@ section.card2 h2 [class^="ic-"]{color:var(--accent)}
     <button class="btn danger small" id="trashBtn" title="Mettre cette photo à la corbeille"><i class=ic-trash></i>Corbeille</button>
   </header>
   <div class="board" id="board">
-    <div class="zone" id="zone-top" data-zone="top"><h2><span class="zname" data-rename="top"></span><span class="hint">appui long = ranger</span></h2><div class="list"></div></div>
+    <div class="zone" id="zone-top" data-zone="top"><h2><span class="zname" data-rename="top"></span><span class="zhead"><span class="hint">appui long = ranger</span><button class="btn small profbtn" id="profBtn" title="Changer de profil d'étiquettes"></button></span></h2><div class="list"></div></div>
     <div class="zone" id="zone-left" data-zone="left"><h2><span class="zname" data-rename="left"></span></h2><div class="list"></div></div>
     <div class="center">
       <div id="stage" title="Cliquer pour agrandir"><img id="stageImg" alt="Photo en cours"><span class="zoomhint"><i class=ic-zoom></i>agrandir</span><div class="dropmsg">Lâchez ici pour coller l'étiquette</div></div>
@@ -544,6 +570,16 @@ section.card2 h2 [class^="ic-"]{color:var(--accent)}
     </div>
     <div class="zone" id="zone-right" data-zone="right"><h2><span class="zname" data-rename="right"></span></h2><div class="list"></div></div>
   </div>
+</section>
+
+<!-- ============ ÉCRAN : ÉTIQUETTES ET PROFILS ============ -->
+<section class="screen" id="s-tagmgr">
+  <header class="bar">
+    <button class="btn" data-go="home"><i class=ic-arrow-left></i>Accueil</button>
+    <h1>Étiquettes et profils</h1>
+    <button class="btn primary" data-go="tag"><i class=ic-tag></i>Étiqueter les photos</button>
+  </header>
+  <main class="pad" id="tmMain"></main>
 </section>
 
 <!-- ============ ÉCRAN : DOUBLONS ============ -->
@@ -817,7 +853,8 @@ const DEFAULT_TAGS = [
 
 const S = {
   photos: [], byId: new Map(), byHash: new Map(), tags: [], tagById: new Map(),
-  dict: [], settings: {...DEFAULT_SETTINGS}, ignored: new Set(), roots: [], fsBroken: false,
+  dict: [], settings: {...DEFAULT_SETTINGS}, ignored: new Set(), roots: [], fsBroken: false, profiles: [],
+  tm: {q: '', zone: 'all', scope: 'profile', sort: 'zone', dir: 1},
   screen: 'home', list: [], idx: 0, lastUndo: null,
   gal: {q: '', mode: 'all', tags: new Set()}, dupPairs: null, dupIdx: 0,
 };
@@ -829,8 +866,14 @@ function reindex() {
   S.tagById = new Map(S.tags.map(t => [t.id, t]));
 }
 const live = () => S.photos.filter(p => !p.trashed);
-const zoneName = z => S.settings.zoneNames[z] || z;
-const tagsOfZone = z => S.tags.filter(t => t.zone === z).sort((a, b) => a.order - b.order);
+/* Profils d'étiquettes : chaque profil a ses noms de zones et ses étiquettes (généalogie, devoirs…).
+   Les étiquettes posées sur les photos restent, quel que soit le profil affiché. */
+const curProfile = () => S.profiles.find(p => p.id === S.settings.profile) || S.profiles[0];
+const profileOf = id => S.profiles.find(p => p.id === id) || curProfile();
+const saveProfiles = () => saveMeta('profiles', S.profiles);
+const zoneName = (z, pid) => (pid ? profileOf(pid) : curProfile())?.zoneNames?.[z] || z;
+const activeTags = () => S.tags.filter(t => t.profile === curProfile()?.id);
+const tagsOfZone = (z, pid = curProfile()?.id) => S.tags.filter(t => t.profile === pid && t.zone === z).sort((a, b) => a.order - b.order);
 const byPath = (a, b) => a.path.localeCompare(b.path, 'fr', {numeric: true});
 
 function applyFont() { document.documentElement.style.fontSize = S.settings.fontSize + 'px'; }
@@ -845,7 +888,7 @@ function go(name) {
   S.screen = name;
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === 's-' + name));
   window.scrollTo(0, 0);
-  ({home: renderHome, tag: renderTag, dups: renderDups, gallery: renderGallery, settings: renderSettings})[name]?.();
+  ({home: renderHome, tag: renderTag, dups: renderDups, gallery: renderGallery, settings: renderSettings, tagmgr: renderTagMgr})[name]?.();
 }
 document.addEventListener('click', e => {
   const g = e.target.closest('[data-go]'); if (g) go(g.dataset.go);
@@ -1399,7 +1442,7 @@ function buildInfo(p) {
   const odTxt = `${od.getFullYear()}-${pad2(od.getMonth() + 1)}-${pad2(od.getDate())} ${pad2(od.getHours())}:${pad2(od.getMinutes())}`;
   return {
     keywords: [...tags.map(t => t.label), ...writers.map(w => 'Baliseur : ' + w), `Date d'origine : ${odTxt}`],
-    hier: [...tags.filter(t => !t.foreign).map(t => zoneName(t.zone) + '|' + t.label), ...writers.map(w => 'Baliseur|' + w), `Date d'origine|${odTxt}`],
+    hier: [...tags.filter(t => !t.foreign).map(t => zoneName(t.zone, t.profile) + '|' + t.label), ...writers.map(w => 'Baliseur|' + w), `Date d'origine|${odTxt}`],
     mpfTags: tags.map(t => (t.foreign ? 'ext' : t.zone) + '|' + t.label),
     description: (p.description || '').trim(), writers, originalISO: od.toISOString(),
   };
@@ -1472,15 +1515,17 @@ async function writeSidecar(p, loc, file) {
 
 /** Transforme les mots clés lus dans une photo en étiquettes de l'application */
 async function tagsFromMeta(m, st) {
-  const ids = [], done = new Set(), zoneByName = new Map(ZONES.map(z => [norm(zoneName(z)), z]));
-  const use = async (label, zone, foreign) => {
+  // « Lieux|Rennes » : le nom de zone désigne aussi le profil (celui affiché en priorité)
+  const ids = [], done = new Set(), zoneByName = new Map(), pid0 = curProfile().id;
+  for (const pr of [curProfile(), ...S.profiles]) for (const z of ZONES) { const k = norm(pr.zoneNames[z] || ''); if (k && !zoneByName.has(k)) zoneByName.set(k, {z, pid: pr.id}); }
+  const use = async (label, zone, foreign, pid = pid0) => {
     label = label.trim(); const k = norm(label); if (!k || done.has(k)) return; done.add(k);
-    let t = S.tags.find(x => norm(x.label) === k);
-    if (!t) { t = await createTag(label, zone); if (foreign) { t.foreign = true; await saveTag(t); if (st) st.foreign++; } if (st) st.newTags++; }
+    let t = S.tags.find(x => x.profile === pid && norm(x.label) === k) || S.tags.find(x => x.profile === pid0 && norm(x.label) === k) || S.tags.find(x => norm(x.label) === k);
+    if (!t) { t = await createTag(label, zone, pid); if (foreign) { t.foreign = true; await saveTag(t); if (st) st.foreign++; } if (st) st.newTags++; }
     ids.push(t.id);
   };
+  for (const h of m.hier) { if (sysHier(h)) continue; const parts = h.split('|'), zp = zoneByName.get(norm(parts[0])); if (zp && parts.length > 1) await use(parts.at(-1), zp.z, false, zp.pid); }
   for (const e of m.mpfTags) { const z = e.slice(0, e.indexOf('|')); await use(e.slice(e.indexOf('|') + 1), ZONES.includes(z) ? z : 'top', !ZONES.includes(z)); }
-  for (const h of m.hier) { if (sysHier(h)) continue; const parts = h.split('|'), z = zoneByName.get(norm(parts[0])); if (z && parts.length > 1) await use(parts.at(-1), z, false); }
   for (const k of m.keywords) if (!sysKw(k)) await use(k, 'top', true);
   for (const h of m.hier) if (!sysHier(h)) await use(h.split('|').pop(), 'top', true);
   return ids;
@@ -1756,7 +1801,7 @@ async function renderTag() {
   renderZones(); renderApplied();
   $('#desc').value = p?.description || ''; $('#desc').disabled = !p;
   if (!wantListen) $('#voicePanel').hidden = true;
-  $('#tagList').innerHTML = S.tags.map(t => `<option value="${esc(t.label)}">`).join('');
+  $('#tagList').innerHTML = activeTags().map(t => `<option value="${esc(t.label)}">`).join('');
   const img = $('#stageImg');
   updateSyncUI();
   if (!p) {
@@ -1773,6 +1818,7 @@ async function renderTag() {
 function useCount() { const m = new Map(); for (const p of live()) for (const t of p.tags) m.set(t, (m.get(t) || 0) + 1); return m; }
 function renderZones() {
   const p = cur(), uses = useCount();
+  $('#profBtn').innerHTML = `${I('layout')}${esc(curProfile().name)}`;
   for (const z of ZONES) {
     $(`[data-rename="${z}"]`).textContent = zoneName(z);
     $(`#zone-${z} .list`).innerHTML = tagsOfZone(z).map(t =>
@@ -1801,11 +1847,11 @@ async function removeTag(id) {
 }
 const toggleTag = id => cur()?.tags.includes(id) ? removeTag(id) : addTag(id);
 
-async function createTag(label, zone) {
+async function createTag(label, zone, pid = curProfile().id) {
   label = label.trim(); if (!label) return null;
-  const ex = S.tags.find(t => norm(t.label) === norm(label)); if (ex) return ex;
-  const order = Math.max(-1, ...tagsOfZone(zone).map(t => t.order)) + 1;
-  const t = {id: uid(), label: cap(label), zone, order, color: COLORS[ZONE_COLOR[zone]]};
+  const ex = S.tags.find(t => t.profile === pid && norm(t.label) === norm(label)); if (ex) return ex;
+  const order = Math.max(-1, ...tagsOfZone(zone, pid).map(t => t.order)) + 1;
+  const t = {id: uid(), label: cap(label), zone, order, color: COLORS[ZONE_COLOR[zone]], profile: pid};
   S.tags.push(t); S.tagById.set(t.id, t); await saveTag(t); return t;
 }
 /** Demande un nom puis crée l'étiquette (option : choisir la zone) */
@@ -1829,36 +1875,43 @@ async function editTag(id) {
     const v = await modal(`<h2>Ranger l'étiquette</h2>
       <label class="lbl">Nom<input id="te-name" class="inp" value="${esc(t.label)}"></label>
       <div class="lbl">Couleur</div><div class="swatches">${COLORS.map((c, i) => `<button class="sw ${t.color === c ? 'sel' : ''}" data-v="color:${i}" style="background:${palette()[i]}" aria-label="Couleur ${i + 1}"></button>`).join('')}</div>
-      <div class="lbl">Place sur l'écran</div><div class="row">${ZONES.map(z => `<button class="btn ${t.zone === z ? 'primary' : ''}" data-v="zone:${z}">${esc(zoneName(z))}</button>`).join('')}</div>
+      <div class="row"><input type="color" id="te-col" value="${esc(colorOf(t))}" aria-label="Autre couleur" style="width:3rem;height:2.4rem;padding:0;border:0;background:none"><button class="btn small" data-v="custom">Utiliser cette autre couleur</button></div>
+      <div class="lbl">Place sur l'écran</div><div class="row">${ZONES.map(z => `<button class="btn ${t.zone === z ? 'primary' : ''}" data-v="zone:${z}">${esc(zoneName(z, t.profile))}</button>`).join('')}</div>
       <div class="lbl">Ordre dans sa zone</div><div class="row"><button class="btn" data-v="step:-1"><i class=ic-chevron-left></i>Plus tôt</button><button class="btn" data-v="step:1">Plus tard<i class=ic-chevron-right></i></button></div>
       <p class="hint">Astuce : vous pouvez aussi garder le doigt appuyé sur une étiquette puis la lâcher sur une autre pour les échanger, ou sur une autre zone pour l'y déplacer.</p>
-      <div class="row end"><button class="btn danger" data-v="delete"><i class=ic-trash></i>Supprimer</button><button class="btn ok big" data-v="done"><i class=ic-check></i>Terminé</button></div>`);
-    const name = $('#te-name')?.value.trim();
+      <div class="row end"><button class="btn danger" data-v="delete"><i class=ic-trash></i>Supprimer</button><button class="btn" data-v="mgr"><i class=ic-sliders></i>Toutes les étiquettes…</button><button class="btn ok big" data-v="done"><i class=ic-check></i>Terminé</button></div>`);
+    const name = $('#te-name')?.value.trim(), custom = $('#te-col')?.value;
     if (name && name !== t.label) { t.label = name; await saveTag(t); }
     if (!v || v === 'done') break;
+    if (v === 'mgr') { go('tagmgr'); return; }
     const [act, arg] = v.split(':');
     if (act === 'color') { t.color = COLORS[+arg]; await saveTag(t); }
+    if (act === 'custom' && custom) { t.color = custom; await saveTag(t); }
     if (act === 'zone' && arg !== t.zone) await moveTagToZone(t, arg);
-    if (act === 'step') {
-      const list = tagsOfZone(t.zone), i = list.indexOf(t), o = list[i + +arg];
-      if (o) { [t.order, o.order] = [o.order, t.order]; await DB.putMany('tags', [t, o]); }
-    }
-    if (act === 'delete') {
-      if (await confirmBox('Supprimer cette étiquette ?', `« ${esc(t.label)} » sera enlevée ${n ? `de <b>${n}</b> photo(s)` : 'de la liste'}.`, '<i class=ic-trash></i>Supprimer', 'Non, la garder', true)) {
-        const touched = S.photos.filter(p => p.tags.includes(id)), saved = snap(touched), savedT = {...t};
-        touched.forEach(p => p.tags = p.tags.filter(x => x !== id)); await DB.putMany('photos', touched);
-        S.tags = S.tags.filter(x => x !== t); await DB.del('tags', id); reindex(); refresh();
-        toast(`Étiquette « ${t.label} » supprimée.`, async () => { S.tags.push(savedT); await saveTag(savedT); reindex(); await undoRestore(saved)(); });
-        return;
-      }
-    }
+    if (act === 'step') await stepTag(t, +arg);
+    if (act === 'delete' && await deleteTag(t)) return;
     reindex(); refresh();
   }
   reindex(); refresh();
 }
+/** Avance / recule une étiquette dans sa zone */
+async function stepTag(t, d) {
+  const list = tagsOfZone(t.zone, t.profile), i = list.indexOf(t), o = list[i + d];
+  if (o) { [t.order, o.order] = [o.order, t.order]; await DB.putMany('tags', [t, o]); reindex(); }
+}
+/** Supprime une étiquette (après confirmation), en l'enlevant des photos ; annulable */
+async function deleteTag(t) {
+  const touched = S.photos.filter(p => p.tags.includes(t.id));
+  if (!(await confirmBox('Supprimer cette étiquette ?', `« ${esc(t.label)} » sera enlevée ${touched.length ? `de <b>${touched.length}</b> photo(s)` : 'de la liste'}.`, '<i class=ic-trash></i>Supprimer', 'Non, la garder', true))) return false;
+  const saved = snap(touched), savedT = {...t};
+  touched.forEach(p => p.tags = p.tags.filter(x => x !== t.id)); await DB.putMany('photos', touched);
+  S.tags = S.tags.filter(x => x !== t); await DB.del('tags', t.id); reindex(); refresh();
+  toast(`Étiquette « ${t.label} » supprimée.`, async () => { S.tags.push(savedT); await saveTag(savedT); reindex(); await undoRestore(saved)(); refresh(); });
+  return true;
+}
 async function moveTagToZone(t, zone, beforeTag) {
   t.zone = zone; t.foreign = false;   // une étiquette « trouvée » rangée devient une étiquette normale
-  const list = tagsOfZone(zone).filter(x => x !== t);
+  const list = tagsOfZone(zone, t.profile).filter(x => x !== t);
   const at = beforeTag ? list.indexOf(beforeTag) : list.length;
   list.splice(at < 0 ? list.length : at, 0, t);
   list.forEach((x, i) => x.order = i);
@@ -1883,8 +1936,9 @@ board.addEventListener('click', async e => {
   if (rn) {
     const z = rn.dataset.rename;
     const v = await modal(`<h2>Nom de cette zone</h2><input class="inp" id="zn" value="${esc(zoneName(z))}"><div class="row end"><button class="btn" data-v="no">Annuler</button><button class="btn ok big" data-v="ok"><i class=ic-check></i>Enregistrer</button></div>`);
-    const val = $('#zn')?.value.trim(); if (v === 'ok' && val) { S.settings.zoneNames[z] = val; await saveMeta('settings', S.settings); renderZones(); }
+    const val = $('#zn')?.value.trim(); if (v === 'ok' && val) { curProfile().zoneNames[z] = val; await saveProfiles(); renderZones(); scheduleSync(); }
   }
+  if (e.target.closest('#profBtn')) chooseProfile();
 });
 board.addEventListener('pointerdown', e => {
   const el = e.target.closest('.tag[data-id]'); if (!el || e.button > 0) return;
@@ -2154,7 +2208,7 @@ function listenOnce() {
   if (!wantListen) return;
   rec = new SR(); rec.lang = 'fr-FR'; rec.interimResults = true; rec.maxAlternatives = 3; rec.continuous = true;
   rec.processLocally = true;   // obligatoire : la voix reste sur l'ordinateur
-  try { if (window.SpeechRecognitionPhrase) rec.phrases = [...S.tags.map(t => t.label), ...S.dict.map(d => d.correct), 'suivante', 'précédente', 'enlève', 'stop', 'description', 'étiquettes', 'virgule', 'à la ligne'].map(w => new SpeechRecognitionPhrase(w, 4)); } catch {}
+  try { if (window.SpeechRecognitionPhrase) rec.phrases = [...activeTags().map(t => t.label), ...S.dict.map(d => d.correct), 'suivante', 'précédente', 'enlève', 'stop', 'description', 'étiquettes', 'virgule', 'à la ligne'].map(w => new SpeechRecognitionPhrase(w, 4)); } catch {}
   rec.onstart = () => setListening(true);
   rec.onresult = e => {
     restarts = 0; bumpIdle();
@@ -2203,14 +2257,15 @@ function tagMatches(phrase, t) {
   if (phrase.length >= 4 && soundKey(phrase) === soundKey(n)) return true;
   const L = phrase.length; return lev(phrase, n) <= (L >= 8 ? 2 : L >= 5 ? 1 : 0);
 }
-function findTag(text) { const n = norm(text); return S.tags.find(t => norm(t.label) === n) || S.tags.find(t => tagMatches(n, t)) || null; }
-function analyse(text) {
+function findTag(text) { const pool = activeTags(), n = norm(text); return pool.find(t => norm(t.label) === n) || pool.find(t => tagMatches(n, t)) || null; }
+/** La voix ne cherche que dans les étiquettes du profil affiché (plus, pour « enlève », celles de la photo) */
+function analyse(text, pool = activeTags()) {
   const toks = applyDict(tokenize(text)), used = toks.map(() => false), found = [];
   for (let len = 4; len >= 1; len--) for (let i = 0; i + len <= toks.length; i++) {
     if (used.slice(i, i + len).some(Boolean)) continue;
     const phrase = toks.slice(i, i + len).map(t => t.n).join(' ');
     if (len === 1 && STOP.has(phrase)) continue;
-    const t = S.tags.find(x => tagMatches(phrase, x));
+    const t = pool.find(x => tagMatches(phrase, x));
     if (t) { found.push(t.id); for (let k = i; k < i + len; k++) used[k] = true; }
   }
   // Les mots restants (hors petits mots) sont regroupés : « Jean Baptiste » reste ensemble
@@ -2250,7 +2305,7 @@ async function handleSpeech(alts) {
     } else if (part.type === 'stop') { voiceStop(); out.push('<p class="muted"><i class=ic-mic></i>Micro coupé.</p>'); }
     else if (part.type === 'undo') { await doUndo(); out.push('<p><i class=ic-undo></i>Annulé.</p>'); }
     else {
-      const res = analyse(part.text);
+      const res = part.type === 'rm' ? analyse(part.text, [...new Set([...activeTags(), ...q.tags.map(id => S.tagById.get(id)).filter(Boolean)])]) : analyse(part.text);
       if (part.type === 'rm') {
         const gone = res.found.filter(id => q.tags.includes(id));
         for (const id of gone) await removeTag(id);
@@ -2294,7 +2349,7 @@ function splitCommands(text) {
 /** « Mal compris » : on choisit le bon mot ; il est retenu pour la prochaine fois */
 async function fixWord(heard, photo = cur()) {
   const n = norm(heard);
-  const close = [...S.tags].sort((a, b) => lev(n, norm(a.label)) - lev(n, norm(b.label))).slice(0, 6);
+  const close = activeTags().sort((a, b) => lev(n, norm(a.label)) - lev(n, norm(b.label))).slice(0, 6);
   const v = await modal(`<h2><i class=ic-pen></i>Que vouliez-vous dire ?</h2><p>J'ai entendu « <b>${esc(heard)}</b> ».</p>
     <div class="choices">${close.map(t => `<button class="btn big" data-v="t:${t.id}" style="justify-content:flex-start"><span class="tag" style="background:${colorOf(t)};min-height:2.2rem">${esc(t.label)}</span></button>`).join('')}</div>
     <label class="lbl">…ou écrivez le bon mot :<input class="inp" id="fx" placeholder="Ex. : Kerguélen"></label>
@@ -2329,7 +2384,7 @@ function galList() {
 let thumbObs;
 function renderGallery() {
   $$('#galModes [data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === S.gal.mode));
-  $('#galTags').innerHTML = S.tags.map(t => `<button class="tag ${S.gal.tags.has(t.id) ? 'on' : ''}" data-ft="${t.id}" style="background:${colorOf(t)}">${esc(t.label)}</button>`).join('');
+  $('#galTags').innerHTML = S.tags.filter(t => t.profile === curProfile().id || S.gal.tags.has(t.id)).map(t => `<button class="tag ${S.gal.tags.has(t.id) ? 'on' : ''}" data-ft="${t.id}" style="background:${colorOf(t)}">${esc(t.label)}</button>`).join('');
   const list = galList();
   $('#galInfo').innerHTML = `<b>${list.length}</b> photo(s)` + (list.length ? ` <button class="btn small primary" id="galTagAll"><i class=ic-tag></i>Étiqueter ces photos une par une</button>` : '')
     + (S.gal.mode === 'trash' && list.length ? ` <button class="btn small danger" id="emptyTrash">Vider la corbeille</button>` : '');
@@ -2391,22 +2446,35 @@ async function openBackup() {
 /** Liste des photos et de leurs étiquettes (tableau pour Excel / LibreOffice), une colonne par zone */
 function exportCsv() {
   const day = new Date().toISOString().slice(0, 10), q = s => '"' + String(s ?? '').replace(/"/g, '""') + '"';
+  const pid = curProfile().id;   // une colonne par zone du profil affiché ; le reste dans « Autres étiquettes »
   const lbl = (p, f) => p.tags.map(id => S.tagById.get(id)).filter(t => t && f(t)).map(t => t.label).join(', ');
   const rows = [['Fichier', 'Dossier', 'Date d\'origine', ...ZONES.map(zoneName), 'Autres étiquettes', 'Description', 'Baliseurs', 'Inscrit dans la photo', 'Copies', 'Corbeille'].map(q).join(';'),
-    ...[...S.photos].sort(byPath).map(p => [p.name, dirOf(p.path), fmtDate(p.originalDate || p.lastModified), ...ZONES.map(z => lbl(p, t => !t.foreign && t.zone === z)), lbl(p, t => t.foreign),
+    ...[...S.photos].sort(byPath).map(p => [p.name, dirOf(p.path), fmtDate(p.originalDate || p.lastModified), ...ZONES.map(z => lbl(p, t => !t.foreign && t.profile === pid && t.zone === z)), lbl(p, t => t.foreign || t.profile !== pid),
       p.description, (p.baliseurs || []).join(', '), p.writtenAt && !isPending(p) ? 'oui' : '', (p.copies || []).join(' | '), p.trashed ? 'oui' : ''].map(q).join(';'))];
   download(`etiquettes-photos-famille-${day}.csv`, '﻿' + rows.join('\r\n'), 'text/csv');
 }
 function backupData() {
-  return {app: 'mes-photos-de-famille', version: 2, date: new Date().toISOString(), settings: S.settings, dict: S.dict, tags: S.tags,
+  return {app: 'mes-photos-de-famille', version: 3, date: new Date().toISOString(), settings: S.settings, dict: S.dict, profiles: S.profiles, tags: S.tags,
     photos: S.photos.map(({hash, name, path, size, lastModified, originalDate, tags, description, baliseurs, trashed, copies}) => ({hash, name, path, size, lastModified, originalDate, tags, description, baliseurs, trashed, copies}))};
 }
 $('#inBackup').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   try {
     const data = JSON.parse(await f.text()); if (data.app !== 'mes-photos-de-famille') throw new Error('format');
-    const idMap = new Map();
-    for (const t of data.tags) { let ex = S.tags.find(x => norm(x.label) === norm(t.label)); if (!ex) { ex = {...t}; S.tags.push(ex); await saveTag(ex); } idMap.set(t.id, ex.id); }
+    const idMap = new Map(), pMap = new Map();
+    // Profils : retrouvés par leur nom, sinon recréés ; les sauvegardes sans profil vont dans le profil affiché
+    for (const bp of data.profiles || []) {
+      let ex = S.profiles.find(p => norm(p.name) === norm(bp.name));
+      if (!ex) { ex = {id: uid(), name: bp.name, zoneNames: {...bp.zoneNames}}; S.profiles.push(ex); }
+      pMap.set(bp.id, ex.id);
+    }
+    if (data.profiles?.length) await saveProfiles();
+    for (const t of data.tags) {
+      const pid = pMap.get(t.profile) || curProfile().id;
+      let ex = S.tags.find(x => x.profile === pid && norm(x.label) === norm(t.label));
+      if (!ex) { ex = {...t, id: S.tagById.has(t.id) ? uid() : t.id, profile: pid}; S.tags.push(ex); await saveTag(ex); }
+      idMap.set(t.id, ex.id);
+    }
     for (const d of data.dict) if (!S.dict.some(x => norm(x.heard) === norm(d.heard))) S.dict.push(d);
     await saveMeta('dict', S.dict);
     reindex(); let n = 0;
@@ -2444,8 +2512,9 @@ async function renderSettings() {
         <button class="themecard" data-theme="classic" aria-pressed="${S.settings.theme === 'classic'}"><span class="pv" style="background:#fff;border:3px solid #111">${PALETTES.classic.slice(0, 4).map(c => `<i style="background:${c}"></i>`).join('')}</span><b>Contraste élevé</b><span class="hint">Traits épais et couleurs franches, pour une vue fatiguée.</span></button>
       </div></section>
     <section class="card2"><h2><i class=ic-type></i>Taille du texte</h2><div class="row"><button class="btn big" data-font="-1">A− Plus petit</button><button class="btn big" data-font="1">A+ Plus grand</button></div></section>
-    <section class="card2"><h2><i class=ic-layout></i>Noms des trois zones d'étiquettes</h2>
-      ${ZONES.map(z => `<label class="lbl">${{top: 'En haut', left: 'À gauche', right: 'À droite'}[z]}<input class="inp" data-zn="${z}" value="${esc(zoneName(z))}"></label>`).join('')}</section>
+    <section class="card2"><h2><i class=ic-layout></i>Étiquettes, couleurs et profils</h2>
+      <p>Profil actuel : <b>${esc(curProfile().name)}</b> — ${activeTags().length} étiquette(s). Noms des zones, couleurs, ordre, profils pour chaque activité : tout se règle dans un tableau.</p>
+      <button class="btn primary" data-go="tagmgr"><i class=ic-sliders></i>Gérer les étiquettes et les profils</button></section>
     <section class="card2"><h2><i class=ic-book></i>Mots corrigés (dictionnaire personnel)</h2>
       <p class="hint">Quand la voix comprend mal un nom ancien ou rare, la correction est retenue ici.</p>
       <div id="dictList">${S.dict.map((d, i) => `<div class="dictrow"><span>« ${esc(d.heard)} » → <b>${esc(d.correct)}</b></span><button class="btn small danger" data-deldict="${i}">Retirer</button></div>`).join('') || '<p class="muted">Aucun mot corrigé pour l\'instant.</p>'}</div>
@@ -2468,7 +2537,6 @@ async function renderSettings() {
   const sg = $('#syncGo'); if (sg) sg.onclick = async () => { await syncNow(true); renderSettings(); };
   const rl = $('#relinkBtn'); if (rl) rl.onclick = relink;
   $$('[data-theme]').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.theme; saveMeta('settings', S.settings); applyTheme(); renderSettings(); });
-  $$('[data-zn]').forEach(i => i.onchange = () => { if (i.value.trim()) { S.settings.zoneNames[i.dataset.zn] = i.value.trim(); saveMeta('settings', S.settings); toast('Enregistré.'); } });
   $$('[data-deldict]').forEach(b => b.onclick = async () => { S.dict.splice(+b.dataset.deldict, 1); await saveMeta('dict', S.dict); renderSettings(); });
   $('#dAdd').onclick = async () => { const h = $('#dH').value.trim(), c = $('#dC').value.trim(); if (!h || !c) return; S.dict.push({heard: h, correct: c}); await saveMeta('dict', S.dict); renderSettings(); };
   const vr = $('#voiceReset'); if (vr) vr.onclick = () => { S.settings.voice = null; saveMeta('settings', S.settings); renderSettings(); };
@@ -2482,11 +2550,166 @@ async function renderSettings() {
   };
 }
 
+/* =====================================================================
+   8b. ÉTIQUETTES ET PROFILS : un tableau (une ligne par étiquette) qu'on filtre et trie
+   ===================================================================== */
+async function setProfile(id) { S.settings.profile = id; await saveMeta('settings', S.settings); reindex(); refresh(); }
+const uniqueProfileName = n => { let name = n, k = 2; while (S.profiles.some(p => norm(p.name) === norm(name))) name = `${n} ${k++}`; return name; };
+const SCHOOL = {zones: {top: 'Matière', left: 'Élève', right: 'Appréciation'},
+  tags: [['Français', 'top', 0], ['Mathématiques', 'top', 3], ['Histoire-géo', 'top', 4], ['Sciences', 'top', 1], ['Anglais', 'top', 5],
+    ['Très bien', 'right', 1], ['Bien', 'right', 5], ['À reprendre', 'right', 4], ['Incomplet', 'right', 2], ['Absent', 'right', 6]]};
+async function newProfile() {
+  const P = curProfile();
+  const card = (v, ic, title, text) => `<button class="btn big choice" data-v="${v}"><i class=ic-${ic}></i><span><b>${title}</b><span class="hint">${text}</span></span></button>`;
+  const v = await modal(`<h2><i class=ic-layout></i>Nouveau profil d'étiquettes</h2>
+    <label class="lbl">Nom du profil<input class="inp" id="pn" placeholder="Ex. : Photos de vacances, Devoirs de 4e…"></label>
+    <div class="lbl">Pour commencer</div>
+    <div class="choices">
+      ${card('copy', 'copy', `Une copie de « ${esc(P.name)} »`, 'Mêmes zones, mêmes étiquettes et mêmes couleurs, à modifier ensuite.')}
+      ${card('empty', 'plus', 'Un profil vide', 'Trois zones vides, à remplir au fur et à mesure.')}
+      ${card('school', 'book', 'Modèle « Devoirs scannés »', 'Zones Matière, Élève et Appréciation, avec quelques étiquettes pour démarrer.')}
+    </div>
+    <div class="row end"><button class="btn" data-v="no">Annuler</button></div>`, d => $('#pn', d).focus());
+  if (!v || v === 'no') return;
+  const typed = ($('#pn')?.value || '').trim();
+  const np = {id: uid(), name: uniqueProfileName(typed || (v === 'copy' ? P.name + ' (copie)' : v === 'school' ? 'Devoirs scannés' : 'Nouveau profil')),
+    zoneNames: v === 'copy' ? {...P.zoneNames} : v === 'school' ? {...SCHOOL.zones} : {top: 'En haut', left: 'À gauche', right: 'À droite'}};
+  S.profiles.push(np); await saveProfiles();
+  let tags = [];
+  if (v === 'copy') tags = activeTags().map(t => ({...t, id: uid(), profile: np.id}));
+  if (v === 'school') tags = SCHOOL.tags.map(([label, zone, c], i) => ({id: uid(), label, zone, order: i, color: COLORS[c], profile: np.id}));
+  if (tags.length) { S.tags.push(...tags); await DB.putMany('tags', tags); }
+  await setProfile(np.id); toast(`Profil « ${np.name} » créé et choisi.`);
+}
+async function renameProfile() {
+  const P = curProfile();
+  const v = await modal(`<h2><i class=ic-pen></i>Renommer le profil</h2><input class="inp" id="prn" value="${esc(P.name)}">
+    <div class="row end"><button class="btn" data-v="no">Annuler</button><button class="btn ok big" data-v="ok"><i class=ic-check></i>Enregistrer</button></div>`, d => $('#prn', d).select());
+  const n = ($('#prn')?.value || '').trim();
+  if (v !== 'ok' || !n || n === P.name) return;
+  P.name = S.profiles.some(p => p !== P && norm(p.name) === norm(n)) ? uniqueProfileName(n) : n;
+  await saveProfiles(); refresh();
+}
+async function deleteProfile() {
+  const P = curProfile(); if (S.profiles.length < 2) return;
+  const tags = S.tags.filter(t => t.profile === P.id), ids = new Set(tags.map(t => t.id));
+  const touched = S.photos.filter(p => p.tags.some(id => ids.has(id)));
+  if (!(await confirmBox(`Supprimer le profil « ${esc(P.name)} » ?`, `Ses <b>${tags.length}</b> étiquette(s) seront supprimées${touched.length ? ` et enlevées de <b>${touched.length}</b> photo(s)` : ''}. Cette action ne peut pas être annulée.`, '<i class=ic-trash></i>Supprimer le profil', 'Non, le garder', true))) return;
+  touched.forEach(p => p.tags = p.tags.filter(id => !ids.has(id))); if (touched.length) await DB.putMany('photos', touched);
+  for (const t of tags) await DB.del('tags', t.id);
+  S.tags = S.tags.filter(t => !ids.has(t.id)); S.profiles = S.profiles.filter(p => p !== P); await saveProfiles();
+  await setProfile(S.profiles[0].id); toast(`Profil « ${P.name} » supprimé.`);
+}
+/** Choix rapide du profil depuis l'écran d'étiquetage */
+async function chooseProfile() {
+  const P = curProfile();
+  const v = await modal(`<h2><i class=ic-layout></i>Profil d'étiquettes</h2>
+    <p>Choisissez les étiquettes à afficher autour de la photo, selon ce que vous faites.</p>
+    <div class="choices">${S.profiles.map(p => `<button class="btn big ${p.id === P.id ? 'primary' : ''}" data-v="p:${p.id}" style="justify-content:flex-start">${p.id === P.id ? I('check') : I('layout')}<span>${esc(p.name)} <small>· ${S.tags.filter(t => t.profile === p.id).length} étiquettes</small></span></button>`).join('')}</div>
+    <div class="row end"><button class="btn" data-v="no">Fermer</button><button class="btn" data-v="mgr"><i class=ic-sliders></i>Gérer les étiquettes et les couleurs</button></div>`);
+  if (v?.startsWith('p:') && v.slice(2) !== P.id) { await setProfile(v.slice(2)); toast(`Profil « ${curProfile().name} ».`); }
+  if (v === 'mgr') go('tagmgr');
+}
+/** Choisir une couleur : les 8 teintes du thème, ou n'importe quelle autre */
+async function pickColor(t) {
+  const v = await modal(`<h2><i class=ic-palette></i>Couleur de « ${esc(t.label)} »</h2>
+    <div class="swatches">${COLORS.map((c, i) => `<button class="sw ${t.color === c ? 'sel' : ''}" data-v="c:${i}" style="background:${palette()[i]}" aria-label="Couleur ${i + 1}"></button>`).join('')}</div>
+    <div class="row" style="margin-top:.8rem"><input type="color" id="pcol" value="${esc(colorOf(t))}" aria-label="Autre couleur" style="width:3rem;height:2.4rem;padding:0;border:0;background:none"><button class="btn" data-v="custom">Utiliser cette autre couleur</button></div>
+    <div class="row end"><button class="btn" data-v="no">Annuler</button></div>`);
+  if (v?.startsWith('c:')) t.color = COLORS[+v.slice(2)];
+  else if (v === 'custom') t.color = $('#pcol').value;
+  else return false;
+  await saveTag(t); return true;
+}
+
+const TM_COLS = [['color', 'Couleur'], ['label', 'Étiquette'], ['zone', 'Zone'], ['profile', 'Profil'], ['uses', 'Photos'], ['', '']];
+function tmRows() {
+  const f = S.tm, q = norm(f.q), uses = useCount(), pid = curProfile().id;
+  const ci = t => { const i = COLORS.indexOf(t.color); return i < 0 ? 99 : i; };
+  const byZone = (a, b) => ZONES.indexOf(a.zone) - ZONES.indexOf(b.zone) || a.order - b.order;
+  const cmp = {label: (a, b) => a.label.localeCompare(b.label, 'fr'), zone: byZone, uses: (a, b) => (uses.get(a.id) || 0) - (uses.get(b.id) || 0) || byZone(a, b),
+    color: (a, b) => ci(a) - ci(b) || byZone(a, b), profile: (a, b) => profileOf(a.profile).name.localeCompare(profileOf(b.profile).name, 'fr') || byZone(a, b)}[f.sort] || byZone;
+  return {uses, list: S.tags.filter(t => (f.scope === 'all' || t.profile === pid)
+      && (f.zone === 'all' || (f.zone === 'ext' ? t.foreign : t.zone === f.zone && !t.foreign))
+      && (!q || norm(t.label).includes(q)))
+    .sort((a, b) => f.scope === 'all' && f.sort === 'zone' ? (profileOf(a.profile).name.localeCompare(profileOf(b.profile).name, 'fr') || byZone(a, b)) * f.dir : cmp(a, b) * f.dir)};
+}
+function renderTagMgr() {
+  const P = curProfile(), f = S.tm, many = S.profiles.length > 1;
+  $('#tmMain').innerHTML = `
+    <section class="card2"><h2><i class=ic-layout></i>Profils</h2>
+      <p class="hint">Un profil regroupe des étiquettes et des noms de zones pour une activité : généalogie, devoirs, photos de vacances… Les étiquettes déjà posées sur les photos restent, quel que soit le profil choisi.</p>
+      <div class="profchips">${S.profiles.map(p => `<button class="btn ${p.id === P.id ? 'primary' : ''}" data-prof="${p.id}" aria-pressed="${p.id === P.id}">${p.id === P.id ? I('check') : ''}${esc(p.name)}<span class="cnt">${S.tags.filter(t => t.profile === p.id).length}</span></button>`).join('')}
+        <button class="btn ok" id="profNew"><i class=ic-plus></i>Nouveau profil</button></div>
+      <div class="zonenames">${ZONES.map(z => `<label class="lbl">Zone ${{top: 'du haut', left: 'de gauche', right: 'de droite'}[z]}<input class="inp" data-pzn="${z}" value="${esc(zoneName(z))}"></label>`).join('')}</div>
+      <div class="row"><button class="btn small" id="profRen"><i class=ic-pen></i>Renommer « ${esc(P.name)} »</button>${many ? `<button class="btn small danger" id="profDel"><i class=ic-trash></i>Supprimer ce profil</button>` : ''}</div>
+    </section>
+    <section class="card2"><h2><i class=ic-tag></i>Étiquettes</h2>
+      <div class="tmtools">
+        <div class="searchwrap"><i class=ic-search></i><input class="inp" id="tmQ" placeholder="Chercher une étiquette…" value="${esc(f.q)}"></div>
+        <select class="inp" id="tmZone" aria-label="Zone"><option value="all">Toutes les zones</option>${ZONES.map(z => `<option value="${z}" ${f.zone === z ? 'selected' : ''}>${f.scope === 'all' ? {top: 'Zone du haut', left: 'Zone de gauche', right: 'Zone de droite'}[z] : esc(zoneName(z))}</option>`).join('')}<option value="ext" ${f.zone === 'ext' ? 'selected' : ''}>Trouvées dans les photos</option></select>
+        ${many ? `<select class="inp" id="tmScope" aria-label="Profil"><option value="profile">Profil « ${esc(P.name)} »</option><option value="all" ${f.scope === 'all' ? 'selected' : ''}>Tous les profils</option></select>` : ''}
+        <button class="btn ok" id="tmAdd"><i class=ic-plus></i>Nouvelle étiquette</button>
+      </div>
+      <div class="tmwrap"><table class="tmtable">
+        <thead><tr>${TM_COLS.filter(([k]) => k !== 'profile' || f.scope === 'all').map(([k, l]) => k ? `<th><button class="thsort ${f.sort === k ? 'on' : ''}" data-sort="${k}">${l}${f.sort === k ? (f.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>` : '<th></th>').join('')}</tr></thead>
+        <tbody id="tmBody"></tbody></table></div>
+      <p class="hint" id="tmInfo"></p>
+    </section>`;
+  $$('[data-prof]').forEach(b => b.onclick = () => setProfile(b.dataset.prof));
+  $('#profNew').onclick = newProfile; $('#profRen').onclick = renameProfile; $('#profDel') && ($('#profDel').onclick = deleteProfile);
+  $$('[data-pzn]').forEach(i => i.onchange = async () => { const v = i.value.trim(); if (!v) return; P.zoneNames[i.dataset.pzn] = v; await saveProfiles(); scheduleSync(); renderTagMgr(); toast('Nom de zone enregistré.'); });
+  $('#tmQ').oninput = e => { f.q = e.target.value; renderTmBody(); };
+  $('#tmZone').onchange = e => { f.zone = e.target.value; renderTmBody(); };
+  $('#tmScope') && ($('#tmScope').onchange = e => { f.scope = e.target.value; if (f.sort === 'profile' && f.scope !== 'all') f.sort = 'zone'; renderTagMgr(); });
+  $$('[data-sort]').forEach(b => b.onclick = () => { if (f.sort === b.dataset.sort) f.dir = -f.dir; else { f.sort = b.dataset.sort; f.dir = b.dataset.sort === 'uses' ? -1 : 1; } renderTagMgr(); });
+  $('#tmAdd').onclick = async () => { const t = await askNewTag(f.zone !== 'all' && f.zone !== 'ext' ? f.zone : null); if (t) { reindex(); renderTagMgr(); } };
+  renderTmBody();
+}
+function renderTmBody() {
+  const f = S.tm, {list, uses} = tmRows();
+  $('#tmBody').innerHTML = list.map(t => {
+    const n = uses.get(t.id) || 0, zl = tagsOfZone(t.zone, t.profile), k = zl.indexOf(t);
+    return `<tr data-tid="${t.id}">
+      <td><button class="swbtn" data-col style="background:${colorOf(t)}" title="Changer la couleur" aria-label="Couleur de ${esc(t.label)}"></button></td>
+      <td><span class="tmname"><input class="inp" data-ren value="${esc(t.label)}" aria-label="Nom">${t.foreign ? '<span class="hint">trouvée dans une photo</span>' : ''}</span></td>
+      <td><select class="inp" data-zsel aria-label="Zone">${ZONES.map(z => `<option value="${z}" ${t.zone === z ? 'selected' : ''}>${esc(zoneName(z, t.profile))}</option>`).join('')}</select></td>
+      ${f.scope === 'all' ? `<td><select class="inp" data-psel aria-label="Profil">${S.profiles.map(p => `<option value="${p.id}" ${t.profile === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></td>` : ''}
+      <td class="num">${n ? `<button class="btn small" data-see title="Voir ces photos">${n}</button>` : '<span class="muted">0</span>'}</td>
+      <td class="act"><button class="btn small" data-up ${k <= 0 ? 'disabled' : ''} title="Plus tôt dans sa zone" aria-label="Plus tôt">↑</button><button class="btn small" data-down ${k >= zl.length - 1 ? 'disabled' : ''} title="Plus tard dans sa zone" aria-label="Plus tard">↓</button><button class="btn small danger" data-del title="Supprimer" aria-label="Supprimer ${esc(t.label)}"><i class=ic-trash></i></button></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" class="muted">Aucune étiquette ne correspond.</td></tr>`;
+  $('#tmInfo').textContent = `${list.length} étiquette(s) affichée(s). Cliquez sur un titre de colonne pour trier. Les changements de nom et de couleur s'appliquent à toutes les photos.`;
+}
+$('#tmMain').addEventListener('click', async e => {
+  const row = e.target.closest('tr[data-tid]'); if (!row) return;
+  const t = S.tagById.get(row.dataset.tid); if (!t) return;
+  if (e.target.closest('[data-col]')) { if (await pickColor(t)) renderTmBody(); }
+  if (e.target.closest('[data-up]')) { await stepTag(t, -1); renderTmBody(); }
+  if (e.target.closest('[data-down]')) { await stepTag(t, 1); renderTmBody(); }
+  if (e.target.closest('[data-del]')) { await deleteTag(t); }
+  if (e.target.closest('[data-see]')) { S.gal = {q: '', mode: 'all', tags: new Set([t.id])}; go('gallery'); }
+});
+$('#tmMain').addEventListener('change', async e => {
+  const row = e.target.closest('tr[data-tid]'); if (!row) return;
+  const t = S.tagById.get(row.dataset.tid); if (!t) return;
+  if (e.target.matches('[data-ren]')) {
+    const v = e.target.value.trim();
+    if (!v || S.tags.some(x => x !== t && x.profile === t.profile && norm(x.label) === norm(v))) { toast(v ? `« ${v} » existe déjà dans ce profil.` : 'Le nom ne peut pas être vide.'); e.target.value = t.label; return; }
+    t.label = v; await saveTag(t); toast('Étiquette renommée.');
+  }
+  if (e.target.matches('[data-zsel]')) { await moveTagToZone(t, e.target.value); reindex(); scheduleSync(); renderTmBody(); }
+  if (e.target.matches('[data-psel]')) {
+    t.profile = e.target.value; t.order = Math.max(-1, ...tagsOfZone(t.zone, t.profile).filter(x => x !== t).map(x => x.order)) + 1;
+    await saveTag(t); reindex(); renderTagMgr(); toast(`Déplacée dans le profil « ${profileOf(t.profile).name} ».`);
+  }
+});
+
 /** Redessine l'écran en cours après un changement */
 function refresh() {
   reindex(); scheduleSync();
   if (S.screen === 'tag') { S.list = S.list.filter(id => S.byId.has(id)); renderTag(); }
-  else ({home: renderHome, dups: renderDups, gallery: renderGallery, settings: renderSettings})[S.screen]?.();
+  else ({home: renderHome, dups: renderDups, gallery: renderGallery, settings: renderSettings, tagmgr: renderTagMgr})[S.screen]?.();
 }
 
 /* =====================================================================
@@ -2499,14 +2722,20 @@ function refresh() {
     return;
   }
   S.photos = await DB.all('photos');
-  S.tags = await DB.all('tags');
-  if (!(await DB.get('meta', 'init'))) {
-    S.tags = DEFAULT_TAGS.map(([label, zone, c], i) => ({id: uid(), label, zone, order: i, color: COLORS[c]}));
-    await DB.putMany('tags', S.tags); await saveMeta('init', true);
-  }
   S.dict = (await DB.get('meta', 'dict'))?.value || [];
   const st = (await DB.get('meta', 'settings'))?.value || {};
   S.settings = {...DEFAULT_SETTINGS, ...st, zoneNames: {...DEFAULT_SETTINGS.zoneNames, ...(st.zoneNames || {})}};
+  // Profils : le premier reprend les anciens noms de zones (versions précédentes)
+  S.profiles = (await DB.get('meta', 'profiles'))?.value || [];
+  if (!S.profiles.length) { S.profiles = [{id: uid(), name: 'Généalogie', zoneNames: {...S.settings.zoneNames}}]; await saveProfiles(); }
+  if (!S.profiles.some(p => p.id === S.settings.profile)) { S.settings.profile = S.profiles[0].id; await saveMeta('settings', S.settings); }
+  S.tags = await DB.all('tags');
+  if (!(await DB.get('meta', 'init'))) {
+    S.tags = DEFAULT_TAGS.map(([label, zone, c], i) => ({id: uid(), label, zone, order: i, color: COLORS[c], profile: S.profiles[0].id}));
+    await DB.putMany('tags', S.tags); await saveMeta('init', true);
+  }
+  const orphanTags = S.tags.filter(t => !S.profiles.some(p => p.id === t.profile));
+  orphanTags.forEach(t => t.profile = S.profiles[0].id); if (orphanTags.length) await DB.putMany('tags', orphanTags);
   S.ignored = new Set((await DB.get('meta', 'ignored'))?.value || []);
   S.roots = (await DB.get('meta', 'roots'))?.value || [];
   for (const p of S.photos) if (p.knownSig === undefined) p.knownSig = contentSig(p);
